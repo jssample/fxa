@@ -7,8 +7,10 @@ import Cocktail from 'cocktail';
 import Template from '../../templates/pair/index.mustache';
 import UserAgentMixin from '../../lib/user-agent-mixin';
 import PairingGraphicsMixin from '../mixins/pairing-graphics-mixin';
+
 import PairingTotpMixin from './pairing-totp-mixin';
 import { DOWNLOAD_LINK_PAIRING_APP } from '../../lib/constants';
+import SyncAuthMixin from '../mixins/sync-auth-mixin';
 
 class PairIndexView extends FormView {
   template = Template;
@@ -26,17 +28,23 @@ class PairIndexView extends FormView {
       return this.replaceCurrentPage('pair/unsupported');
     }
 
+    const account = this.broker.get('browserSignedInAccount');
     // If we reach this point that means we are in Firefox Desktop
-    if (! this.broker.get('browserSignedInAccount')) {
-      // if we are not logged into Sync then we offer to sign in
+    if (! account) {
+      // if we are not logged into Sync then we offer to connect
       return this.replaceCurrentPage('connect_another_device');
+    }
+
+    if (! account.verified || ! account.sessionToken) {
+      // if account is not verified or missing sessionToken then offer to sign in or confirm
+      return window.location.href = this.getEscapedSyncUrl('signin', 'fxa:pair');
     }
 
     if (! this.broker.hasCapability('supportsPairing')) {
       return this.replaceCurrentPage('pair/unsupported');
     }
 
-    return this.checkTotpStatus();
+    return this.checkTotpStatus(account.sessionToken);
   }
 
   setInitialContext (context) {
@@ -55,6 +63,7 @@ Cocktail.mixin(
   PairingGraphicsMixin,
   PairingTotpMixin(),
   UserAgentMixin,
+  SyncAuthMixin,
 );
 
 export default PairIndexView;
